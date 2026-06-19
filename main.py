@@ -6,6 +6,7 @@ import config
 from services.query_agent import generate_search_query
 from services.linkedin_client import search_candidates, fetch_candidate_profile
 from services.ranking_engine import rank_candidate
+from services.exporter import generate_excel_report
 
 def run_full_pipeline() -> None:
     config.setup_logging(log_level=logging.INFO)
@@ -72,6 +73,9 @@ def run_full_pipeline() -> None:
 
     print("\n--- FINAL CANDIDATE SHORTLIST ---")
     print(json.dumps(shortlist_reports, indent=2))
+
+    # Export the shortlist to an Excel file
+    generate_excel_report(shortlist_reports)
 
 if __name__ == "__main__":
     run_full_pipeline()
