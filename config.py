@@ -23,7 +23,7 @@ if not RENIDLY_API_KEY:
     raise ValueError("CRITICAL ERROR: 'RENIDLY_API_KEY' is missing from the environment configuration.")
 
 # Renidly Base URL
-RENIDLY_BASE_URL = "https://renidly.com/api/v2"
+RENIDLY_BASE_URL = "https://renidly.com/api/data/v1"
 
 # Model Selection
 GROQ_LLM_MODEL = "llama-3.3-70b-versatile"
