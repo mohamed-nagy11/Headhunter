@@ -28,6 +28,9 @@ RENIDLY_BASE_URL = "https://renidly.com/api/data/v1"
 # Model Selection
 GROQ_LLM_MODEL = "llama-3.3-70b-versatile"
 
+# Search Configuration
+DEFAULT_SEARCH_LIMIT = 5
+
 def setup_logging(log_level: int = logging.INFO) -> None:
     """Configures system-wide logging with both console and rotating file handlers.
 
