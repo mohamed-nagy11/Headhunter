@@ -57,3 +57,65 @@ def fetch_candidate_profile(handle: str) -> dict:
     except requests.exceptions.RequestException as e:
         logger.error(f"Transport layer error encountered for handle [{normalized_handle}]: {str(e)}")
         return None
+
+def search_candidates(target_title: str, location: str, mandatory_skills: str, limit: int = 15) -> list[str]:
+    """Searches the Renidly v2 database for matching candidate handles.
+
+    Args:
+        target_title (str): The normalized job title to filter profiles.
+        location (str): The geographic region or city requirement.
+        mandatory_skills (str): A boolean string containing required skills.
+        limit (int, optional): Maximum number of records to return. Defaults to 15.
+
+    Returns:
+        list[str]: A list of profile handles (slugs) matching the criteria.
+                   Returns an empty list if the search fails or finds no results.
+    """
+    logger.info(f"Initiating candidate search | Title: '{target_title}' | Location: '{location}'")
+    
+    url = f"{RENIDLY_BASE_URL}/person/search"
+    headers = {
+        "X-renidly-apikey": RENIDLY_API_KEY,
+        "Accept": "application/json"
+    }
+    
+    # Payload structured per Renidly v2 filter specifications
+    payload = {
+        "title": target_title.strip(),
+        "location": location.strip(),
+        "keywords": mandatory_skills.strip(),
+        "limit": limit
+    }
+
+    try:
+        # Enforce the strict 15-second timeout constraint
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        response.raise_for_status()
+        body = response.json()
+
+        # Enforce envelope validation pattern
+        if not body.get("success"):
+            logger.error(
+                f"Renidly Search Failed | Status: {body.get('statusCode')} "
+                f"| Message: {body.get('message')}"
+            )
+            return []
+
+        # Extract items from the data payload
+        data_payload = body.get("data", {})
+        results = data_payload.get("results", [])
+        
+        # Safely parse out the 'handle' field for each candidate found
+        handles = [item.get("handle") for item in results if item.get("handle")]
+        
+        logger.info(f"Search complete. Discovered {len(handles)} candidate handles.")
+        logger.debug(f"Discovered handles: {handles}")
+        
+        return handles
+
+    except requests.exceptions.Timeout:
+        logger.error("Renidly search operation timed out after 15 seconds.")
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Transport layer error encountered during candidate search: {str(e)}")
+        return []
