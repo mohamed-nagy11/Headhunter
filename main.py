@@ -2,20 +2,21 @@
 
 import logging
 import json
+import argparse
 import config
 from services.query_agent import generate_search_query
 from services.linkedin_client import search_candidates, fetch_candidate_profile
 from services.ranking_engine import rank_candidate
 from services.exporter import generate_excel_report
 
-def run_full_pipeline() -> None:
+def run_full_pipeline(raw_jd: str, target_location: str) -> None:
+    """Executes the complete pipeline: Search -> Enrich -> Rank -> Export."""
     config.setup_logging(log_level=logging.INFO)
     logger = logging.getLogger(__name__)
     
     logger.info("=== Starting FULL Sourcing & Ranking Pipeline ===")
-    
-    raw_jd = "Looking for a Python Developer who knows FastAPI and Docker."
-    target_location = "Egypt"
+    logger.info(f"Target Role: {raw_jd[:50]}...")
+    logger.info(f"Target Location: {target_location}")
     
     parsed_query = generate_search_query(raw_jd, target_location)
     if not parsed_query: return
@@ -37,16 +38,16 @@ def run_full_pipeline() -> None:
         profile_data = fetch_candidate_profile(handle)
         if not profile_data: continue
 
-        # Safely extract location without filtering them out
-        full_location = profile_data.get("geo_full") or profile_data.get("geo_country") or "Location not specified"
-        city = profile_data.get("geo_city") or "N/A"
-        country = profile_data.get("geo_country") or "N/A"
+        candidate_location = profile_data.get("geo_full") or profile_data.get("geo_country") or "Location not specified"
             
         ranking = rank_candidate(profile_data, raw_jd)
         if not ranking: continue
             
         first_name = profile_data.get("firstName") or profile_data.get("first_name") or profile_data.get("name", "").split(" ")[0] or ""
         last_name = profile_data.get("lastName") or profile_data.get("last_name") or ""
+        
+        city = profile_data.get("geo_city") or "N/A"
+        country = profile_data.get("geo_country") or "N/A"
         
         positions = profile_data.get("full_positions") or []
         current_title = "N/A"
@@ -56,10 +57,9 @@ def run_full_pipeline() -> None:
             latest_job = positions[0]
             current_title = latest_job.get("title") or latest_job.get("job_title") or "N/A"
             current_employer = latest_job.get("organization_name") or latest_job.get("company_name") or "N/A"
-
+            
         candidate_report = {
             "Name": f"{first_name} {last_name}".strip() or handle,
-            "Location": full_location,
             "City": city,
             "Country": country,
             "Current Position": current_title,
@@ -73,9 +73,37 @@ def run_full_pipeline() -> None:
 
     print("\n--- FINAL CANDIDATE SHORTLIST ---")
     print(json.dumps(shortlist_reports, indent=2))
-
-    # Export the shortlist to an Excel file
+    
+    # Export the final data
     generate_excel_report(shortlist_reports)
 
 if __name__ == "__main__":
-    run_full_pipeline()
+    # Set up the CLI argument parser
+    parser = argparse.ArgumentParser(
+        description="HR Headhunter Agent: AI-powered candidate sourcing and ranking pipeline.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    
+    parser.add_argument(
+        "-j", "--jd", 
+        type=str, 
+        required=True, 
+        help="The raw Job Description or primary requirements."
+    )
+    
+    parser.add_argument(
+        "-l", "--location", 
+        type=str, 
+        required=True, 
+        help="The target geographical location (e.g., 'Egypt', 'San Francisco')."
+    )
+    
+    # Parse the arguments provided by the user in the terminal
+    args = parser.parse_args()
+    
+    # Run the pipeline with the user's inputs
+    run_full_pipeline(raw_jd=args.jd, target_location=args.location)
+
+    # Example usage:
+    # python main.py -j "Looking for a Python Developer who knows FastAPI and Docker." -l "Egypt"
+    # python main.py --jd "Senior React Frontend Engineer with 5+ years of experience in Redux and Tailwind CSS." --location "UAE"
