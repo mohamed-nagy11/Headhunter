@@ -18,7 +18,6 @@ client = Groq(api_key=GROQ_API_KEY)
 class SearchParameters(BaseModel):
     """Pydantic model defining the strict JSON output schema for the LLM."""
     target_title: str = Field(description="The normalized, core job title (e.g., 'Software Engineer').")
-    location: str = Field(description="The primary country or city name.")
     mandatory_skills: str = Field(description="A boolean search string of absolutely required skills (e.g., '\"Python\" AND \"AWS\"').")
     preferred_skills: str = Field(description="A boolean search string of nice-to-have skills (e.g., '\"Docker\" OR \"Kubernetes\"').")
 

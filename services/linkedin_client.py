@@ -10,13 +10,13 @@ from config import RENIDLY_BASE_URL, RENIDLY_API_KEY
 
 logger = logging.getLogger(__name__)
 
-def search_candidates(target_title: str, location: str, mandatory_skills: str, limit: int = 15) -> list[str]:
+def search_candidates(target_title: str, geo_country_code: str, mandatory_skills: str, limit: int = 15) -> list[str]:
     """Searches the Renidly database with defensive parsing for the result list."""
     url = f"{RENIDLY_BASE_URL}/people/search"
     headers = {"X-renidly-apikey": RENIDLY_API_KEY}
     params = {
         "title": target_title,
-        "location": location,
+        "geo_country_code": geo_country_code,
         "keywords": mandatory_skills,
         "limit": limit
     }
