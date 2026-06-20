@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
+import pycountry
 from main import run_full_pipeline
+
+# Generate mapping from pycountry (sorted alphabetically)
+country_map = {country.name: country.alpha_2.lower() for country in sorted(pycountry.countries, key=lambda x: x.name)}
 
 # 1. Page Configuration
 st.set_page_config(
@@ -28,9 +32,10 @@ with col1:
 
 with col2:
     st.subheader("2. Target Location")
-    target_location = st.text_input(
-        "Geographical boundary:", 
-        placeholder="e.g., Egypt, Remote, San Francisco"
+    target_country_names = st.multiselect(
+        "Search and select target countries:", 
+        options=list(country_map.keys()),
+        placeholder="e.g., Egypt, United Arab Emirates"
     )
 
 st.divider()
@@ -38,8 +43,8 @@ st.divider()
 # 4. Action Button & Pipeline Execution
 if st.button("🚀 Start AI Sourcing Pipeline", type="primary", use_container_width=True):
     
-    if not raw_jd or not target_location:
-        st.warning("⚠️ Please provide both a Job Description and a Target Location before starting.")
+    if not raw_jd or not target_country_names:
+        st.warning("⚠️ Please provide both a Job Description and at least one Target Location before starting.")
     else:
         # Use st.status to show a cool loading animation while the backend works
         with st.status("Executing AI Pipeline (This may take a minute)...", expanded=True) as status:
@@ -49,7 +54,12 @@ if st.button("🚀 Start AI Sourcing Pipeline", type="primary", use_container_wi
             
             # Call your actual backend function!
             try:
-                candidates, excel_path = run_full_pipeline(raw_jd=raw_jd, target_location=target_location)
+                iso_codes = [country_map[name] for name in target_country_names]
+                candidates, excel_path = run_full_pipeline(
+                    raw_jd=raw_jd, 
+                    target_country_names=target_country_names, 
+                    target_iso_codes=iso_codes
+                )
                 status.update(label="Pipeline Complete!", state="complete", expanded=False)
                 success = True
             except Exception as e:
