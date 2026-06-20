@@ -3,30 +3,41 @@
 import logging
 import json
 import argparse
+import sys
+import pycountry
+import questionary
 import config
 from services.query_agent import generate_search_query
 from services.linkedin_client import search_candidates, fetch_candidate_profile
 from services.ranking_engine import rank_candidate
 from services.exporter import generate_excel_report
 
-def run_full_pipeline(raw_jd: str, target_location: str) -> None:
+def run_full_pipeline(raw_jd: str, target_country_names: list[str], target_iso_codes: list[str]) -> None:
     """Executes the complete pipeline: Search -> Enrich -> Rank -> Export."""
     config.setup_logging(log_level=logging.INFO)
     logger = logging.getLogger(__name__)
     
+    target_location_str = ", ".join(target_country_names)
     logger.info("=== Starting FULL Sourcing & Ranking Pipeline ===")
     logger.info(f"Target Role: {raw_jd[:50]}...")
-    logger.info(f"Target Location: {target_location}")
+    logger.info(f"Target Locations: {target_location_str}")
     
-    parsed_query = generate_search_query(raw_jd, target_location)
+    parsed_query = generate_search_query(raw_jd, target_location_str)
     if not parsed_query: return
-        
-    discovered_handles = search_candidates(
-        target_title=parsed_query["target_title"],
-        location=parsed_query["location"], 
-        mandatory_skills=parsed_query["mandatory_skills"],
-        limit=config.DEFAULT_SEARCH_LIMIT
-    )
+    all_discovered_handles = []
+    
+    for iso_code in target_iso_codes:
+        logger.info(f"Searching candidates in {iso_code.upper()}...")
+        handles = search_candidates(
+            target_title=parsed_query["target_title"],
+            geo_country_code=iso_code, 
+            mandatory_skills=parsed_query["mandatory_skills"],
+            limit=config.DEFAULT_SEARCH_LIMIT
+        )
+        if handles:
+            all_discovered_handles.extend(handles)
+            
+    discovered_handles = list(set(all_discovered_handles))
     
     if not discovered_handles: return
         
@@ -97,7 +108,7 @@ def run_full_pipeline(raw_jd: str, target_location: str) -> None:
     
     # Clean the strings to make them safe for Windows/Mac filenames
     safe_title = parsed_query["target_title"].replace(" ", "_").replace("/", "-")
-    safe_location = target_location.replace(" ", "_").replace(",", "")
+    safe_location = "_".join(target_country_names).replace(" ", "_").replace(",", "")
     
     # Construct a dynamic, unique filename
     excel_path = f"data/Shortlist_{safe_title}_{safe_location}.xlsx"
@@ -121,19 +132,31 @@ if __name__ == "__main__":
         help="The raw Job Description or primary requirements."
     )
     
-    parser.add_argument(
-        "-l", "--location", 
-        type=str, 
-        required=True, 
-        help="The target geographical location (e.g., 'Egypt', 'San Francisco')."
-    )
-    
     # Parse the arguments provided by the user in the terminal
     args = parser.parse_args()
     
+    # Generate mapping from pycountry (sorted alphabetically)
+    country_map = {country.name: country.alpha_2.lower() for country in sorted(pycountry.countries, key=lambda x: x.name)}
+    
+    print("\n")
+    # Interactively ask for target countries
+    selected_country_names = questionary.checkbox(
+        "Search and select target countries (Type to search, Space to select, Enter to confirm):",
+        choices=list(country_map.keys())
+    ).ask()
+    
+    if not selected_country_names:
+        print("No countries selected. Exiting.")
+        sys.exit(0)
+        
+    iso_codes = [country_map[name] for name in selected_country_names]
+    
     # Run the pipeline with the user's inputs
-    run_full_pipeline(raw_jd=args.jd, target_location=args.location)
+    run_full_pipeline(
+        raw_jd=args.jd, 
+        target_country_names=selected_country_names, 
+        target_iso_codes=iso_codes
+    )
 
     # Example usage:
-    # python main.py -j "Looking for a Python Developer who knows FastAPI and Docker." -l "Egypt"
-    # python main.py --jd "Senior React Frontend Engineer with 5+ years of experience in Redux and Tailwind CSS." --location "UAE"
+    # python main.py -j "Looking for a Python Developer who knows FastAPI and Docker."
