@@ -37,6 +37,14 @@ with col2:
         options=list(country_map.keys()),
         placeholder="e.g., Egypt, United Arab Emirates"
     )
+    limit = st.slider(
+        "Search limit per country:",
+        min_value=1,
+        max_value=100,
+        value=5,
+        step=1,
+        help="The maximum number of candidate profiles to source from each country."
+    )
 
 st.divider()
 
@@ -58,7 +66,8 @@ if st.button("🚀 Start AI Sourcing Pipeline", type="primary", use_container_wi
                 candidates, excel_path = run_full_pipeline(
                     raw_jd=raw_jd, 
                     target_country_names=target_country_names, 
-                    target_iso_codes=iso_codes
+                    target_iso_codes=iso_codes,
+                    limit=limit
                 )
                 status.update(label="Pipeline Complete!", state="complete", expanded=False)
                 success = True
