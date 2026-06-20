@@ -12,7 +12,7 @@ from services.linkedin_client import search_candidates, fetch_candidate_profile
 from services.ranking_engine import rank_candidate
 from services.exporter import generate_excel_report
 
-def run_full_pipeline(raw_jd: str, target_country_names: list[str], target_iso_codes: list[str]) -> None:
+def run_full_pipeline(raw_jd: str, target_country_names: list[str], target_iso_codes: list[str], limit: int = config.DEFAULT_SEARCH_LIMIT) -> None:
     """Executes the complete pipeline: Search -> Enrich -> Rank -> Export."""
     config.setup_logging(log_level=logging.INFO)
     logger = logging.getLogger(__name__)
@@ -29,10 +29,10 @@ def run_full_pipeline(raw_jd: str, target_country_names: list[str], target_iso_c
     for iso_code in target_iso_codes:
         logger.info(f"Searching candidates in {iso_code.upper()}...")
         handles = search_candidates(
-            target_title=parsed_query["target_title"],
-            geo_country_code=iso_code, 
-            mandatory_skills=parsed_query["mandatory_skills"],
-            limit=config.DEFAULT_SEARCH_LIMIT
+            parsed_query["target_title"],
+            iso_code, 
+            parsed_query["mandatory_skills"],
+            limit
         )
         if handles:
             all_discovered_handles.extend(handles)
@@ -132,6 +132,13 @@ if __name__ == "__main__":
         help="The raw Job Description or primary requirements."
     )
     
+    parser.add_argument(
+        "-n", "--limit", 
+        type=int, 
+        default=config.DEFAULT_SEARCH_LIMIT, 
+        help="The maximum number of profiles to search per country."
+    )
+    
     # Parse the arguments provided by the user in the terminal
     args = parser.parse_args()
     
@@ -155,7 +162,8 @@ if __name__ == "__main__":
     run_full_pipeline(
         raw_jd=args.jd, 
         target_country_names=selected_country_names, 
-        target_iso_codes=iso_codes
+        target_iso_codes=iso_codes,
+        limit=args.limit
     )
 
     # Example usage:
