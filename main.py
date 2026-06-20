@@ -37,8 +37,6 @@ def run_full_pipeline(raw_jd: str, target_location: str) -> None:
         
         profile_data = fetch_candidate_profile(handle)
         if not profile_data: continue
-
-        candidate_location = profile_data.get("geo_full") or profile_data.get("geo_country") or "Location not specified"
             
         ranking = rank_candidate(profile_data, raw_jd)
         if not ranking: continue
@@ -46,8 +44,30 @@ def run_full_pipeline(raw_jd: str, target_location: str) -> None:
         first_name = profile_data.get("firstName") or profile_data.get("first_name") or profile_data.get("name", "").split(" ")[0] or ""
         last_name = profile_data.get("lastName") or profile_data.get("last_name") or ""
         
-        city = profile_data.get("geo_city") or "N/A"
-        country = profile_data.get("geo_country") or "N/A"
+        # Get the raw location fields
+        raw_full = profile_data.get("geo_full") or profile_data.get("geo_country") or "Location not specified"
+        raw_city = profile_data.get("geo_city") or ""
+        raw_country = profile_data.get("geo_country") or ""
+        
+        city = raw_city
+        country = raw_country
+
+        # If country is empty, try to infer it from the full location
+        if not country and raw_full != "Location not specified":
+            parts = [p.strip() for p in raw_full.split(",")]
+            country = parts[-1] # The country is almost always the last item
+            
+            # If there are no commas, the user likely only provided a country
+            if len(parts) == 1:
+                city = "N/A"
+                
+        # Final cleanup: If city somehow exactly matches country, wipe the city
+        if city.lower() == country.lower():
+            city = "N/A"
+            
+        # Ensure fallback strings
+        city = city or "N/A"
+        country = country or "N/A"
         
         positions = profile_data.get("full_positions") or []
         current_title = "N/A"
@@ -60,6 +80,7 @@ def run_full_pipeline(raw_jd: str, target_location: str) -> None:
             
         candidate_report = {
             "Name": f"{first_name} {last_name}".strip() or handle,
+            "Full Location": raw_full,
             "City": city,
             "Country": country,
             "Current Position": current_title,
@@ -74,8 +95,17 @@ def run_full_pipeline(raw_jd: str, target_location: str) -> None:
     print("\n--- FINAL CANDIDATE SHORTLIST ---")
     print(json.dumps(shortlist_reports, indent=2))
     
-    # Export the final data
-    generate_excel_report(shortlist_reports)
+    # Clean the strings to make them safe for Windows/Mac filenames
+    safe_title = parsed_query["target_title"].replace(" ", "_").replace("/", "-")
+    safe_location = target_location.replace(" ", "_").replace(",", "")
+    
+    # Construct a dynamic, unique filename
+    excel_path = f"data/Shortlist_{safe_title}_{safe_location}.xlsx"
+    
+    # Export the final data using the dynamic path
+    generate_excel_report(shortlist_reports, filename=excel_path)
+    
+    return shortlist_reports, excel_path
 
 if __name__ == "__main__":
     # Set up the CLI argument parser
